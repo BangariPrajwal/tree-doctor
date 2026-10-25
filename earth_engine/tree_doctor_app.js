@@ -1,4 +1,4 @@
-// Tree Doctor – App v20 (cooling rate from an 8-city study; phones: simple list ⇄ full-screen map switch; only the newest check is drawn; big zones split into neighbourhood-size pieces): past → now → 2050 (Landsat + ERA5 weather records + NASA climate models), plain-language zones,
+// Tree Doctor – App v33 (phones: full-width map, tip to turn sideways for a full-screen map; phone map gets an exact height; version shown; rebuilt phone layout: list OR full-screen map, sized to the real space, tablets side-by-side; phones: full-screen map with floating list, lighter drawing; safe phone sizing; phone: Show on map switches to the map first; phone screen sized in exact pixels; cooling rate from an 8-city study; phones: simple list ⇄ full-screen map switch; only the newest check is drawn; big zones split into neighbourhood-size pieces): past → now → 2050 (Landsat + ERA5 weather records + NASA climate models), plain-language zones,
 //                         one-tap examples, use-my-location, share link, download table, phone layout,
 //                         hotspot zones, Telugu/Hindi/English + listen, town search, tree-loss alert
 var SIZE_KM = 14;              // analysed area around the chosen place (km)
@@ -37,6 +37,7 @@ var CLIMATE_SINCE = 1990;      // ERA5 weather records: warming trend measured f
 // NASA NEX-GDDP-CMIP6 climate models used for the future (a mix of low, middle and high warming models)
 var CLIMATE_MODELS = ['ACCESS-CM2', 'GFDL-ESM4', 'MPI-ESM1-2-HR', 'MRI-ESM2-0', 'UKESM1-0-LL'];
 var text = require('users/gena/packages:text');   // draws letters on the map
+var APP_VERSION = 'v33';
 var GITHUB_URL = 'https://github.com/BangariPrajwal/tree-doctor';
 var LINKEDIN_URL = 'https://www.linkedin.com/in/prajwal-bangari-800434118';
 // One-tap examples: [name, latitude, longitude] of a dense, lived-in part of each city
@@ -61,6 +62,7 @@ var T = {
       (city ? 'measured in ' + city : 'average of 8 cities studied worldwide') + ').'; },
     credit: 'Built by Bangari Prajwal',
     showMapBtn: '🗺️ Show map',
+    phoneTip: '📱 Tip: turn your phone sideways for a bigger map.',
     backList: '📋 Back to list',
     heatS: ['very hot', 'hot', 'warm', 'mild'],
     treeS: ['almost no trees', 'few trees', 'some trees', 'many trees'],
@@ -149,6 +151,7 @@ var T = {
       (city ? city + 'లో కొలిచాం' : 'ప్రపంచవ్యాప్తంగా 8 నగరాల సగటు') + ').'; },
     credit: 'రూపొందించినది: బంగారి ప్రజ్వల్',
     showMapBtn: '🗺️ మ్యాప్ చూపించు',
+    phoneTip: '📱 చిట్కా: పెద్ద మ్యాప్ కోసం ఫోన్‌ను అడ్డంగా తిప్పండి.',
     backList: '📋 జాబితాకు తిరిగి',
     heatS: ['చాలా వేడిగా ఉంది', 'వేడిగా ఉంది', 'కొంచెం వేడిగా ఉంది', 'మామూలుగా ఉంది'],
     treeS: ['దాదాపు చెట్లు లేవు', 'చెట్లు తక్కువగా ఉన్నాయి', 'కొన్ని చెట్లు ఉన్నాయి', 'చాలా చెట్లు ఉన్నాయి'],
@@ -233,6 +236,7 @@ var T = {
       (city ? city + ' में मापा गया' : 'दुनिया के 8 शहरों का औसत') + ')।'; },
     credit: 'बनाया: बंगारी प्रज्वल',
     showMapBtn: '🗺️ नक्शा दिखाएँ',
+    phoneTip: '📱 सुझाव: बड़े नक्शे के लिए फ़ोन को आड़ा (तिरछा) घुमाएँ।',
     backList: '📋 सूची पर वापस',
     heatS: ['बहुत गर्म है', 'गर्म है', 'थोड़ा गर्म है', 'सामान्य है'],
     treeS: ['लगभग कोई पेड़ नहीं है', 'पेड़ कम हैं', 'कुछ पेड़ हैं', 'बहुत पेड़ हैं'],
@@ -319,26 +323,55 @@ map.setOptions('HYBRID');
 map.style().set('cursor', 'crosshair');
 var panel = ui.Panel({style: {width: '450px', padding: '10px'}});
 ui.root.add(ui.SplitPanel(panel, map));
-// Phones: side-by-side is too narrow, so show EITHER the list OR the full-screen map,
-// with a button to switch between them.
+// ---------------------------------------------------------------- PHONE LAYOUT
+// Laptops and tablets keep the side-by-side layout. Phones (narrow screens) show ONE thing at a time:
+// the list, or the full-screen map. Both stay on the page and are only hidden/shown, so the map is
+// never rebuilt (rebuilding it was heavy and could crash phones).
 var isPhone = false;
+var lastView = null;                        // where the map should look when it is shown
+// On iPhones held upright, Earth Engine can stretch the map to the full width OR the full height,
+// not both (tested in v27-v32). Full width is used; sideways the map fills the whole screen.
+var phoneTip = ui.Label('', {fontSize: '13px', color: '#555', margin: '0 8px 4px 8px', shown: false});
 var showMapBtn = ui.Button({style: {stretch: 'horizontal', margin: '4px 0', shown: false},
   onClick: function() { showMapView(); }});
 var backListBtn = ui.Button({onClick: function() { showListView(); }});
-var backListPanel = ui.Panel([backListBtn], null, {position: 'top-center', shown: false, padding: '0'});
+var backListPanel = ui.Panel([backListBtn], null, {position: 'bottom-right', shown: false, padding: '0'});
 map.add(backListPanel);
-function showMapView() { if (isPhone) { ui.root.widgets().reset([map]); } }
-function showListView() { if (isPhone) { ui.root.widgets().reset([panel]); } }
-ui.root.onResize(function(device) {
-  if (device.is_mobile && !isPhone) {
-    isPhone = true;
-    panel.style().set({width: '100%', stretch: 'both'});
-    map.style().set({stretch: 'both'});
-    showMapBtn.style().set('shown', true);
-    backListPanel.style().set('shown', true);
-    showListView();
-  }
-});
+function rememberView(lon, lat, zoom) {
+  lastView = {lon: lon, lat: lat, zoom: zoom};
+  map.setCenter(lon, lat, zoom);
+}
+function showMapView() {
+  if (!isPhone) { return; }
+  panel.style().set('shown', false);
+  map.style().set('shown', true);
+  backListPanel.style().set('shown', true);
+  // a map that was hidden must be re-centred once it is visible again
+  ui.util.setTimeout(function() {
+    if (lastView) { map.setCenter(lastView.lon, lastView.lat, lastView.zoom); }
+  }, 300);
+}
+function showListView() {
+  if (!isPhone) { return; }
+  map.style().set('shown', false);
+  backListPanel.style().set('shown', false);
+  panel.style().set('shown', true);
+}
+// Size the list to the space the phone really gives the app (screen minus the browser bars and
+// the Earth Engine header, about 160 px), so it never runs off the screen and always scrolls.
+function fitPhone(device) {
+  try {
+    var w = Math.max(260, Math.floor(device.width || 360));
+    var h = Math.max(200, Math.floor(device.height || 640) - 160);
+    panel.style().set({width: w + 'px', height: h + 'px', margin: '0px', padding: '8px'});
+  } catch (e) { /* keep the default size if the phone refuses one */ }
+}
+function isNarrowPhone(device) {
+  if (!device.is_mobile) { return false; }
+  if (device.is_tablet) { return false; }
+  if (device.width && device.width >= 700) { return false; }   // tablets: keep side-by-side
+  return true;
+}
 
 var H = {fontSize: '15px', fontWeight: 'bold', margin: '12px 0 4px 0'};
 var P = {fontSize: '14px', whiteSpace: 'pre-wrap', margin: '2px 0'};
@@ -376,6 +409,7 @@ var linkedinL = ui.Label({value: 'LinkedIn', targetUrl: LINKEDIN_URL, style: {fo
 var creditPanel = ui.Panel([creditL, codeL, linkedinL], ui.Panel.Layout.flow('horizontal', true));
 panel.add(ui.Panel([ui.Label('🌐'), langSelect], ui.Panel.Layout.flow('horizontal')));
 panel.add(showMapBtn);
+panel.add(phoneTip);
 [titleL, taglineL, tryT, examplesPanel, useMeBtn, howT, howL, townBox, townBtn, townList, coordBox, coordHelpL,
  coordBtn, status, results, aboutL, creditPanel]
   .forEach(function(w) { panel.add(w); });
@@ -414,10 +448,11 @@ function refreshText() {
   titleL.setValue(t('title'));
   taglineL.setValue(t('tagline'));
   showMapBtn.setLabel(t('showMapBtn'));
+  phoneTip.setValue(t('phoneTip'));
   backListBtn.setLabel(t('backList'));
   tryT.setValue(t('tryTitle'));
   useMeBtn.setLabel(t('useMe'));
-  creditL.setValue(t('credit'));
+  creditL.setValue(t('credit') + ' · ' + APP_VERSION);
   codeL.setValue(t('code'));
   howT.setValue(t('howTitle'));
   howL.setValue(t('how'));
@@ -566,7 +601,7 @@ function analyse(lon, lat, placeName) {
   var utm = 'EPSG:' + ((lat >= 0 ? 32600 : 32700) + Math.floor((lon + 180) / 6) + 1);
   var proj20 = ee.Projection(utm).atScale(20);
   var now = ee.Date(Date.now());
-  map.centerObject(area, 12);
+  rememberView(lon, lat, 12);
   map.addLayer(ee.FeatureCollection([ee.Feature(area)]).style(
     {color: 'ffffff', fillColor: '00000000', width: 2, lineType: 'dashed'}), {}, 'Area checked (white dashed box)');
 
@@ -854,6 +889,7 @@ function drawMap(r, heat, canopy1m, treesCut) {
   var labels = [];
   r.zones.forEach(function(z, i) {
     z.cells.forEach(function(d) {
+      if (isPhone && d !== z.top) { return; }          // phones: one letter per zone (less memory)
       labels.push(text.draw(LETTERS[i], ee.Geometry.Point([d.lon, d.lat]), 15,
         {fontSize: d === z.top ? 32 : 24, textColor: 'ffffff', outlineColor: '000000',
          outlineWidth: 3, outlineOpacity: 0.9}));
@@ -863,12 +899,16 @@ function drawMap(r, heat, canopy1m, treesCut) {
   keyPanel.style().set('shown', true);
 }
 function highlight(z) {
-  if (selectedLayer) { map.layers().remove(selectedLayer); }
-  selectedLayer = ui.Map.Layer(ee.FeatureCollection(z.cells.map(square)).style(
-    {color: 'ffff00', fillColor: 'ffff0033', width: 4}), {}, 'Selected zone');
-  map.layers().add(selectedLayer);
-  map.setCenter(z.top.lon, z.top.lat, 15);
-  showMapView();   // on phones, jump to the map
+  // On phones: show the map FIRST (a hidden map cannot be zoomed), then draw and zoom after a short pause
+  showMapView();
+  var draw = function() {
+    if (selectedLayer) { map.layers().remove(selectedLayer); }
+    selectedLayer = ui.Map.Layer(ee.FeatureCollection(z.cells.map(square)).style(
+      {color: 'ffff00', fillColor: 'ffff0033', width: 4}), {}, 'Selected zone');
+    map.layers().add(selectedLayer);
+    rememberView(z.top.lon, z.top.lat, 15);
+  };
+  if (isPhone) { ui.util.setTimeout(draw, 400); } else { draw(); }
 }
 
 // ================================================================ RESULTS (cards)
@@ -1006,6 +1046,22 @@ coordBtn.onClick(function() {
   var lat = parseFloat(p[0]), lon = parseFloat(p[1]);
   if (isNaN(lat) || isNaN(lon)) { say(t('badCoord')); return; }
   analyse(lon, lat);
+});
+
+// Phone layout: registered last, so every widget it uses already exists
+ui.root.onResize(function(device) {
+  if (isPhone) { fitPhone(device); return; }        // rotation: just resize the list
+  if (!isNarrowPhone(device)) { return; }
+  isPhone = true;
+  ui.root.clear();
+  try { ui.root.setLayout(ui.Panel.Layout.flow('vertical')); } catch (e) {}
+  try { map.style().set('stretch', 'both'); } catch (e) {}   // full width (and full screen sideways)
+  fitPhone(device);
+  ui.root.add(panel);
+  ui.root.add(map);
+  showMapBtn.style().set('shown', true);
+  phoneTip.style().set('shown', true);
+  showListView();
 });
 
 // If the app was opened from a shared link (…#lat=..&lon=..), show that place straight away
