@@ -1,0 +1,14 @@
+{
+ "city": "Hyderabad",
+ "slope_per_10pct": -0.33,
+ "ci_low": -0.57,
+ "ci_high": -0.09,
+ "p_value": 0.008,
+ "r2": 0.11,
+ "n_spots": 2451,
+ "brightness_p": 0.006,
+ "building_per_10pct": 0.08,
+ "heat_period": "Mar-May 2026 (Landsat 8/9)",
+ "landcover_period": "Aug-Oct 2026 (Dynamic World)",
+ "spots_with_trees_pct": 5.2
+}
