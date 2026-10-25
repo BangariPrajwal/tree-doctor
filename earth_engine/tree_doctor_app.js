@@ -1,11 +1,31 @@
-// Tree Doctor – App v19 (phones: simple list ⇄ full-screen map switch; only the newest check is drawn; big zones split into neighbourhood-size pieces): past → now → 2050 (Landsat + ERA5 weather records + NASA climate models), plain-language zones,
+// Tree Doctor – App v20 (cooling rate from an 8-city study; phones: simple list ⇄ full-screen map switch; only the newest check is drawn; big zones split into neighbourhood-size pieces): past → now → 2050 (Landsat + ERA5 weather records + NASA climate models), plain-language zones,
 //                         one-tap examples, use-my-location, share link, download table, phone layout,
 //                         hotspot zones, Telugu/Hindi/English + listen, town search, tree-loss alert
 var SIZE_KM = 14;              // analysed area around the chosen place (km)
 var CELL_M = 500;              // size of each neighbourhood square (m)
 var TARGET = 0.30;             // 30% tree cover target (3-30-300 rule)
 var CANOPY_M2 = 50;            // shade area of one grown tree (assumption)
-var COOLING_PER_10PCT = 0.33;  // °C per +10% tree cover (Hyderabad street-level study)
+// °C cooler roofs & roads per +10% tree canopy, measured on 93,282 streets in 8 cities
+// (analysis/multicity_model.py, data/multicity_results.csv). Inside or near a studied city
+// (within 150 km) that city's own rate is used; anywhere else, the median of the 8 cities.
+var CITY_COOLING = [
+  ['Nairobi', -1.28, 36.82, 1.27], ['Mumbai', 19.06, 72.86, 1.17], ['Dubai', 25.27, 55.31, 1.15],
+  ['London', 51.515, -0.05, 0.88], ['New York', 40.73, -73.93, 0.82], ['Delhi', 28.65, 77.22, 0.62],
+  ['Singapore', 1.35, 103.85, 0.61], ['Hyderabad', 17.36, 78.47, 0.47]
+];
+var COOLING_MEDIAN = 0.85;
+var COOLING_PER_10PCT = COOLING_MEDIAN;   // set for each place checked, see coolingFor()
+var COOLING_SOURCE = null;                // city the rate came from (null = 8-city median)
+function coolingFor(lat, lon) {
+  var best = null, bestKm = 150;
+  CITY_COOLING.forEach(function(c) {
+    var dy = (lat - c[1]) * 111.32, dx = (lon - c[2]) * 111.32 * Math.cos(lat * Math.PI / 180);
+    var km = Math.sqrt(dx * dx + dy * dy);
+    if (km < bestKm) { bestKm = km; best = c; }
+  });
+  COOLING_PER_10PCT = best ? best[3] : COOLING_MEDIAN;
+  COOLING_SOURCE = best ? best[0] : null;
+}
 var YEARS_BACK = 5;            // tree-loss comparison period
 var MAX_ZONES = 5;             // hotspot zones shown (A–E)
 var MAX_ZONE_KM2 = 3;          // a zone bigger than this is split into neighbourhood-size pieces
@@ -37,6 +57,8 @@ var T = {
     share: '🔗 To share this result: copy the link in your browser\'s address bar. It opens this same place.',
     download: '⬇️ Download the full table (for councils and NGOs)',
     fPlan: function(n, p) { return '• Planting about ' + n + ' trees in these zones would shade and cool about ' + p + ' people.'; },
+    fRate: function(x, city) { return '• Here, every 10% more tree cover makes roofs and roads about ' + x + '°C cooler (' +
+      (city ? 'measured in ' + city : 'average of 8 cities studied worldwide') + ').'; },
     credit: 'Built by Bangari Prajwal',
     showMapBtn: '🗺️ Show map',
     backList: '📋 Back to list',
@@ -106,7 +128,7 @@ var T = {
       'temperature. Trees are counted with a detailed 1-metre tree map (Meta/WRI, mostly 2018–2020) that includes ' +
       'small garden and street trees, updated with live satellite images to remove trees cut since. Very young ' +
       'saplings may still be missed. The cooling estimate comes from a ' +
-      'study of Hyderabad; shade cooling of 10–20°C on the ground is from the US EPA. Past: today\'s heat minus the warming trend measured by ERA5 ' +
+      'study of 93,282 streets in 8 cities (Hyderabad, Delhi, Mumbai, Dubai, Singapore, Nairobi, London, New York); shade cooling of 10–20°C on the ground is from the US EPA. Past: today\'s heat minus the warming trend measured by ERA5 ' +
       'weather records (' + CLIMATE_SINCE + '–now) and minus the effect of trees cut since. ' +
       'Future: hottest days (90th percentile) in NASA NEX-GDDP-CMIP6 climate models ' +
       '(5 models); the ' + FUTURE_YEAR + ' numbers are estimates that assume the ground warms as much as the air and that, ' +
@@ -123,6 +145,8 @@ var T = {
     share: '🔗 ఈ ఫలితాన్ని పంచుకోవడానికి: బ్రౌజర్ పై భాగంలోని లింక్‌ను కాపీ చేసి పంపండి. అది ఇదే ప్రదేశాన్ని తెరుస్తుంది.',
     download: '⬇️ పూర్తి పట్టికను డౌన్‌లోడ్ చేయండి (పురపాలక సంస్థలు, NGOల కోసం)',
     fPlan: function(n, p) { return '• ఈ జోన్లలో సుమారు ' + n + ' చెట్లు నాటితే, సుమారు ' + p + ' మందికి నీడ, చల్లదనం అందుతుంది.'; },
+    fRate: function(x, city) { return '• ఇక్కడ చెట్లు 10% పెరిగిన ప్రతిసారీ పైకప్పులు, రోడ్లు సుమారు ' + x + '°C చల్లబడతాయి (' +
+      (city ? city + 'లో కొలిచాం' : 'ప్రపంచవ్యాప్తంగా 8 నగరాల సగటు') + ').'; },
     credit: 'రూపొందించినది: బంగారి ప్రజ్వల్',
     showMapBtn: '🗺️ మ్యాప్ చూపించు',
     backList: '📋 జాబితాకు తిరిగి',
@@ -190,7 +214,7 @@ var T = {
     about: 'డేటా గురించి: ఉచిత ఉపగ్రహ చిత్రాలు (Landsat, Sentinel-2), భవనాలు మరియు జనాభా ప్రపంచ పటాలు. ' +
       '"నేల ఉష్ణోగ్రత" అంటే అత్యంత వేడి రోజుల్లో నేల మరియు పైకప్పులు ఎంత వేడెక్కుతాయో, గాలి ఉష్ణోగ్రత కాదు. ' +
       'చెట్లను 1-మీటర్ వివరమైన చెట్ల పటం (Meta/WRI, ఎక్కువగా 2018–2020) తో లెక్కిస్తాం, ఇందులో ఇంటి తోటల మరియు వీధుల్లోని చిన్న చెట్లు కూడా ఉంటాయి; ఆ తర్వాత నరికిన చెట్లను తాజా ఉపగ్రహ చిత్రాలతో తీసివేస్తాం. చాలా లేత మొక్కలు కనిపించకపోవచ్చు. ' +
-      'చల్లదనం అంచనా హైదరాబాద్ అధ్యయనం నుండి తీసుకున్నది. ' +
+      'చల్లదనం అంచనా 8 నగరాల్లోని 93,282 వీధుల అధ్యయనం నుండి తీసుకున్నది. ' +
       'చెట్ల నీడలో నేల 10–20°C చల్లబడటం US EPA సమాచారం. గతం: ఇప్పటి వేడి నుండి, ERA5 వాతావరణ రికార్డులు (' + CLIMATE_SINCE + '–ఇప్పటి వరకు) చూపిన వేడి పెరుగుదలను, ఆ తర్వాత నరికిన చెట్ల ప్రభావాన్ని తీసివేసి లెక్కించాం. భవిష్యత్తు: NASA NEX-GDDP-CMIP6 వాతావరణ నమూనాలు (5 నమూనాలు); ' +
       FUTURE_YEAR + ' సంఖ్యలు అంచనాలు మాత్రమే: గాలి వేడెక్కినంతగా నేల కూడా వేడెక్కుతుందని, ఏమీ చేయకపోతే ఇటీవలి వేగంతో చెట్ల నరికివేత కొనసాగుతుందని భావించాం. ' +
       'ఇది ప్రణాళిక కోసం మార్గదర్శి మాత్రమే: ప్రతి ప్రదేశాన్ని స్వయంగా పరిశీలించండి. రూపొందించినది: బంగారి ప్రజ్వల్.'
@@ -205,6 +229,8 @@ var T = {
     share: '🔗 यह नतीजा भेजने के लिए: ब्राउज़र के ऊपर वाला लिंक कॉपी करके भेजें। वह यही जगह खोलेगा।',
     download: '⬇️ पूरी तालिका डाउनलोड करें (नगर निगम और NGO के लिए)',
     fPlan: function(n, p) { return '• इन क्षेत्रों में लगभग ' + n + ' पेड़ लगाने से लगभग ' + p + ' लोगों को छाया और ठंडक मिलेगी।'; },
+    fRate: function(x, city) { return '• यहाँ हर 10% ज़्यादा पेड़ों से छतें और सड़कें लगभग ' + x + '°C ठंडी होती हैं (' +
+      (city ? city + ' में मापा गया' : 'दुनिया के 8 शहरों का औसत') + ')।'; },
     credit: 'बनाया: बंगारी प्रज्वल',
     showMapBtn: '🗺️ नक्शा दिखाएँ',
     backList: '📋 सूची पर वापस',
@@ -272,7 +298,7 @@ var T = {
     about: 'डेटा के बारे में: मुफ़्त उपग्रह चित्र (Landsat, Sentinel-2) और इमारतों व आबादी के वैश्विक नक्शे। ' +
       '"ज़मीन का तापमान" यानी सबसे गर्म दिनों में ज़मीन और छतें कितनी गर्म होती हैं, हवा का तापमान नहीं। ' +
       'पेड़ों की गिनती 1-मीटर विस्तृत पेड़ नक्शे (Meta/WRI, ज़्यादातर 2018–2020) से होती है, जिसमें घरों के बगीचों और सड़कों के छोटे पेड़ भी शामिल हैं; फिर ताज़ा उपग्रह चित्रों से कटे हुए पेड़ हटाए जाते हैं। बहुत छोटे पौधे शायद न दिखें। ' +
-      'ठंडक का अनुमान हैदराबाद के अध्ययन पर आधारित है। ' +
+      'ठंडक का अनुमान 8 शहरों की 93,282 सड़कों के अध्ययन पर आधारित है। ' +
       'छाया में ज़मीन 10–20°C ठंडी होने की जानकारी US EPA से। पहले का अनुमान: आज की गर्मी में से ERA5 मौसम रिकॉर्ड (' + CLIMATE_SINCE + '–अब) में मापी गई बढ़ोतरी और तब से कटे पेड़ों का असर घटाया गया। आगे का अनुमान: NASA NEX-GDDP-CMIP6 जलवायु मॉडल (5 मॉडल); ' +
       FUTURE_YEAR + ' के आँकड़े केवल अनुमान हैं: मान लिया है कि ज़मीन हवा जितनी गर्म होगी, और कुछ न करने पर पेड़ हाल की रफ़्तार से कटते रहेंगे। ' +
       'यह केवल योजना के लिए मार्गदर्शक है: हर जगह की खुद जाँच करें। बनाया: बंगारी प्रज्वल।'
@@ -533,6 +559,8 @@ function analyse(lon, lat, placeName) {
   ui.url.set('place', placeName || '');
   ui.url.set('lang', LANG);
 
+  coolingFor(lat, lon);
+  var rate = COOLING_PER_10PCT, rateCity = COOLING_SOURCE;
   var pt = ee.Geometry.Point([lon, lat]);
   var area = pt.buffer(SIZE_KM * 500).bounds();
   var utm = 'EPSG:' + ((lat >= 0 ? 32600 : 32700) + Math.floor((lon + 180) / 6) + 1);
@@ -661,6 +689,8 @@ function analyse(lon, lat, placeName) {
     if (myRun !== runId) { return; }   // the user already started a newer check
     if (err) { stopLoading(t('err') + '\n(' + err + ')', false); return; }
     if (!r.n) { stopLoading(t('none'), false); return; }
+    COOLING_PER_10PCT = rate; COOLING_SOURCE = rateCity;
+    r.rate = rate; r.rateCity = rateCity;
     r.zones = makeZones(r.all);
     lastResult = r;
     stopLoading(t('done'), true);
@@ -719,10 +749,10 @@ function runTimeline(r, area, livedIn, heatNow, pt) {
         // share of the zone losing trees each year, from the trees cut in the last YEARS_BACK years
         var lossPerYear = (z.cutHa / (z.km2 * 100)) / YEARS_BACK;
         var lostSince = Math.min(0.3, lossPerYear * yearsBack);
-        z.past = z.heat - climate - lostSince * 10 * COOLING_PER_10PCT;
+        z.past = z.heat - climate - lostSince * 10 * (r.rate || COOLING_PER_10PCT);
         if (w !== null) {
           var moreLoss = Math.min(z.trees, lossPerYear * yearsLeft);
-          z.futNo = z.heat + w + moreLoss * 10 * COOLING_PER_10PCT;
+          z.futNo = z.heat + w + moreLoss * 10 * (r.rate || COOLING_PER_10PCT);
           z.futYes = z.heat + w - z.cooling;
         }
       });
@@ -856,7 +886,8 @@ function showResults(r) {
   var zonePeople = r.zones.reduce(function(s, z) { return s + z.people; }, 0);
   var findings = t('fHeat')(Math.round(r.avgHeat)) + '\n' + t('fTrees')(Math.round(100 * r.under5 / r.n)) +
     (r.cutHa >= 0.5 ? '\n' + t('fLoss')(r.cutHa.toFixed(1)) : '') +
-    (zoneNeed > 0 ? '\n' + t('fPlan')(nice(roundTo(zoneNeed, 100)), nice(roundTo(zonePeople, 100))) : '');
+    (zoneNeed > 0 ? '\n' + t('fPlan')(nice(roundTo(zoneNeed, 100)), nice(roundTo(zonePeople, 100))) : '') +
+    (r.rate ? '\n' + t('fRate')(r.rate.toFixed(2), r.rateCity) : '');
   var tl = r.timeline;
   if (!tl) {
     findings += '\n' + t('tLoading');
