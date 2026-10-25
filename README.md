@@ -24,7 +24,7 @@ For a 14 × 14 km area around the place you choose, Tree Doctor splits the town 
 | Trees needed to reach 30% canopy (3-30-300 rule) | Canopy gap × area ÷ 50 m² per grown tree |
 | What to do | Plant in open plots, or (in the most packed 25%) street trees + cool white roofs |
 | **Past → now → 2050** | ERA5 weather records since 1990 + NASA NEX-GDDP-CMIP6 climate models (5 models, SSP2-4.5 and SSP5-8.5) |
-| Cooling from planting | 0.33°C per +10% tree cover across the area (measured, see below), and 10–20°C cooler ground under the shade (US EPA) |
+| Cooling from planting | 0.47–1.27°C per +10% tree canopy, using the rate measured in the nearest of 8 study cities (or the 8-city median, 0.85°C, elsewhere), plus 10–20°C cooler ground under the shade (US EPA) |
 
 Other features: **one-tap example cities**, **use my location**, **shareable result links** (the link opens the same place and language), **a downloadable table** of every neighbourhood with Google Maps links for councils and NGOs, a **🔊 Listen** button that reads results aloud, and a phone layout.
 
@@ -36,15 +36,28 @@ priority = (heat above the local average) × (people ÷ most crowded square) × 
 
 Hot **and** crowded **and** treeless ranks first. A hot empty field or a hot but leafy suburb does not.
 
-## The science: does planting trees actually cool a street?
+## The science: how much do trees cool a street, and does it depend on the city?
 
-I measured it in Hyderabad. 2,451 street-level spots were sampled, and their surface temperature was regressed on tree cover within 100 m, controlling for buildings, surface brightness (albedo), nearby water and location (OLS with HC3 robust standard errors, `analysis/tree_cooling_model.py`).
+I measured it on **93,282 lived-in street locations in 8 cities with very different climates**. For each spot, the surface temperature on the hottest days was regressed on the share of tree canopy within 100 m (1 m Meta/WRI canopy map), controlling for building cover, surface brightness (albedo), nearby water, population and location. Standard errors are clustered in ~1 km blocks, because neighbouring streets are not independent (`analysis/multicity_model.py`, results in `data/multicity_results.csv`).
 
-| Result | Value |
-|---|---|
-| **Cooling per +10% tree cover** | **0.33°C** (95% CI 0.09–0.57, p = 0.008) |
-| Brighter (more reflective) surfaces | significantly cooler (p = 0.006), which supports cool roofs where there is no room to plant |
-| More buildings | +0.08°C per +10% |
+| City | Climate | Streets | °C cooler per +10% tree canopy (95% CI) |
+|---|---|---|---|
+| Nairobi | mild highland | 11,637 | **1.27** (1.16–1.38) |
+| Mumbai | tropical, humid | 10,420 | **1.17** (1.08–1.27) |
+| Dubai | hot desert | 7,038 | **1.15** (0.86–1.43) |
+| London | temperate oceanic | 14,586 | **0.88** (0.81–0.96) |
+| New York | humid continental | 11,249 | **0.82** (0.74–0.91) |
+| Delhi | hot semi-arid | 13,341 | **0.62** (0.55–0.68) |
+| Singapore | tropical rainforest | 9,404 | **0.61** (0.46–0.76) |
+| Hyderabad | hot semi-arid | 15,607 | **0.47** (0.40–0.54) |
+
+**Findings**
+
+- Trees cooled streets in **every** city (all p < 10⁻¹⁴). Median: **0.85°C cooler per +10% tree canopy**.
+- The effect differs **up to 2.7×** between cities, so one city's number should not be applied everywhere. The app uses the nearest study city's own rate (within 150 km), and the 8-city median elsewhere.
+- The differences do not follow a simple "hotter city = more cooling" rule. The two semi-arid Indian cities show the smallest effect, possibly because dry-season trees transpire less and dust lowers the contrast. With only 8 cities, this is a lead for future work, not a conclusion.
+
+**How the study improved.** The first version measured trees in Hyderabad with a 10 m "tree / not tree" label and found 0.33°C per +10%. Repeating it in 8 cities exposed the problem: that label marked London and New York streets as almost treeless (5% and 1.6% of spots with any tree), because thin street trees rarely fill a 10 m pixel. Re-measuring with the 1 m canopy map gave realistic tree cover (London 12%, Mumbai 24%, Dubai 2.5%) and the results above. The original Hyderabad-only scripts are kept in `earth_engine/hyderabad_study/` for transparency.
 
 ## Validation: what checking against reality changed
 
@@ -54,18 +67,19 @@ Every version was checked against satellite imagery, Google Maps and local knowl
 2. **Factories are not homes.** Industrial estates (Jeedimetla, Pashamylaram) ranked highly. Squares that are mostly non-residential buildings (EU GHSL) are now removed.
 3. **A fix that made things worse.** One filter removed real Old City neighbourhoods. It was reverted and rebuilt at a consistent scale.
 4. **Roads are not space for trees.** Open-space estimates now exclude roads.
-5. **"Trees don't cool."** A coarse 1 km model showed only 0.1°C. Measuring street by street gave a clear 0.33°C per 10%.
+5. **"Trees don't cool."** A coarse 1 km model showed only 0.1°C. Measuring street by street gave a clear effect (0.33°C per 10% at first, later refined by the 8-city study above).
 6. **Small trees were invisible.** Ground-truthing in Guildford (UK) showed a zone marked "1% trees" actually had many small trees. Switching to a 1 m canopy map raised it to a realistic 10%.
 7. **A lake shown as "trees cut".** Seasonal water and crop changes were wrongly counted as felling. Only trees → buildings/roads/bare ground now counts, and only near homes.
 8. **A heatwave mistaken for a trend.** Comparing 2014–16 with the 2025 summer showed a fake +10°C rise in Guildford. The past is now estimated from 36 years of ERA5 weather records instead of one summer's satellite pictures.
 9. **Zones too big to act on.** Hyderabad's Zone A covered 19 km² and 4 lakh people. Zones are now split into neighbourhood-sized pieces (≤ 3 km²).
+10. **One city is not the world.** The cooling rate was first measured only in Hyderabad. An 8-city study showed it varies 2.7× between cities and that the original tree measure missed street trees; both were fixed (see above).
 
-Places checked on the ground or on imagery: **Hyderabad, Mahabubnagar (India), Guildford (UK)**, plus spot checks in Delhi, London and Dubai.
+Places checked on the ground or on imagery: **Hyderabad, Mahabubnagar (India), Guildford (UK)**, plus spot checks in Delhi, London and Dubai. Cooling measured in 8 cities on 4 continents.
 
 ## Limitations (honest list)
 
 - Satellites measure **surface** temperature (roofs, roads), not the air temperature people feel.
-- The cooling estimate comes from one city (Hyderabad) and shows **association, not proven cause**. The model explains about 11% of street-level heat differences.
+- The cooling rates show **association, not proven cause**: greener streets may differ in other ways the controls miss. They come from 8 cities; places far from all of them use the 8-city median.
 - Population (2020), building type (2018) and the 1 m canopy map (mostly 2018–2020) are a few years old. Very young saplings may be missed.
 - 2050 values are estimates. They assume surface heat rises as fast as daily maximum air temperature, and (for "if nothing is done") that trees keep being cut at the recent rate.
 - Zones are ranked **within each 14 km area**, not across a whole country.
@@ -77,7 +91,10 @@ Places checked on the ground or on imagery: **Hyderabad, Mahabubnagar (India), G
 |---|---|
 | `earth_engine/tree_doctor_app.js` | The live global app (Google Earth Engine, JavaScript) |
 | `earth_engine/hyderabad_study/` | City-wide Hyderabad study: processing, scoring and street sample scripts |
-| `analysis/tree_cooling_model.py` | Street-level regression (statsmodels, robust standard errors) |
+| `earth_engine/multicity_sample.js` | 8-city street sample for the cooling study |
+| `analysis/multicity_model.py` | 8-city cooling model (statsmodels, spatially clustered errors) |
+| `data/multicity_results.csv` | Cooling per +10% tree canopy for each city |
+| `analysis/tree_cooling_model.py` | Original Hyderabad-only model (first version) |
 | `data/` | Hyderabad results table and model summary |
 | `app.py` | Streamlit + pydeck dashboard of the city-wide Hyderabad study |
 
