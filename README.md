@@ -22,7 +22,8 @@ For a 14 × 14 km area around the place you choose, Tree Doctor splits the town 
 | Trees cut since 5 years ago (only near homes) | Dynamic World land cover: trees → buildings, roads or bare ground |
 | People living there | WorldPop 100 m |
 | Trees needed to reach 30% canopy (3-30-300 rule) | Canopy gap × area ÷ 50 m² per grown tree |
-| What to do | Plant in open plots, or (in the most packed 25%) street trees + cool white roofs |
+| **Trees that actually fit** | 30% of open ground (not roofs or roads) at 50 m² per tree, plus one street tree every 10 m along half of the road edges |
+| **A realistic plan** | 🌳 plant trees (most fit) · 🌳+⬜ plant what fits + cool white roofs · ⬜ cool roofs, terrace gardens, planters and tree pits (packed areas) |
 | **Past → now → 2050** | ERA5 weather records since 1990 + NASA NEX-GDDP-CMIP6 climate models (5 models, SSP2-4.5 and SSP5-8.5) |
 | Cooling from planting | 0.47–1.27°C per +10% tree canopy, using the rate measured in the nearest of 8 study cities (or the 8-city median, 0.85°C, elsewhere), plus 10–20°C cooler ground under the shade (US EPA) |
 
@@ -73,6 +74,7 @@ Every version was checked against satellite imagery, Google Maps and local knowl
 8. **A heatwave mistaken for a trend.** Comparing 2014–16 with the 2025 summer showed a fake +10°C rise in Guildford. The past is now estimated from 36 years of ERA5 weather records instead of one summer's satellite pictures.
 9. **Zones too big to act on.** Hyderabad's Zone A covered 19 km² and 4 lakh people. Zones are now split into neighbourhood-sized pieces (≤ 3 km²).
 10. **One city is not the world.** The cooling rate was first measured only in Hyderabad. An 8-city study showed it varies 2.7× between cities and that the original tree measure missed street trees; both were fixed (see above).
+11. **Advice that could not be followed.** In packed concrete colonies there is no room for thousands of trees, so "plant 15,000 trees" was not a usable plan. Each zone now shows how many trees physically fit and recommends cool roofs, terrace gardens and planters for the rest; cooling and 2050 estimates only count trees that fit (Hyderabad's Zone A: 14,950 needed, room for about 4,050).
 
 Places checked on the ground or on imagery: **Hyderabad, Mahabubnagar (India), Guildford (UK)**, plus spot checks in Delhi, London and Dubai. Cooling measured in 8 cities on 4 continents.
 
@@ -83,6 +85,7 @@ Places checked on the ground or on imagery: **Hyderabad, Mahabubnagar (India), G
 - Population (2020), building type (2018) and the 1 m canopy map (mostly 2018–2020) are a few years old. Very young saplings may be missed.
 - 2050 values are estimates. They assume surface heat rises as fast as daily maximum air temperature, and (for "if nothing is done") that trees keep being cut at the recent rate.
 - Zones are ranked **within each 14 km area**, not across a whole country.
+- "Trees that fit" is a cautious estimate of **physical** space: satellites cannot tell public land from private yards, so it shows what is possible, not what is permitted.
 - This is a planning guide: every site still needs checking on the ground.
 
 ## Repository
