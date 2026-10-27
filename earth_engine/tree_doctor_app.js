@@ -1,4 +1,4 @@
-// Tree Doctor – App v33 (phones: full-width map, tip to turn sideways for a full-screen map; phone map gets an exact height; version shown; rebuilt phone layout: list OR full-screen map, sized to the real space, tablets side-by-side; phones: full-screen map with floating list, lighter drawing; safe phone sizing; phone: Show on map switches to the map first; phone screen sized in exact pixels; cooling rate from an 8-city study; phones: simple list ⇄ full-screen map switch; only the newest check is drawn; big zones split into neighbourhood-size pieces): past → now → 2050 (Landsat + ERA5 weather records + NASA climate models), plain-language zones,
+// Tree Doctor – App v34 (realistic plans: trees that fit + cool roofs; phones: full-width map, tip to turn sideways for a full-screen map; phone map gets an exact height; version shown; rebuilt phone layout: list OR full-screen map, sized to the real space, tablets side-by-side; phones: full-screen map with floating list, lighter drawing; safe phone sizing; phone: Show on map switches to the map first; phone screen sized in exact pixels; cooling rate from an 8-city study; phones: simple list ⇄ full-screen map switch; only the newest check is drawn; big zones split into neighbourhood-size pieces): past → now → 2050 (Landsat + ERA5 weather records + NASA climate models), plain-language zones,
 //                         one-tap examples, use-my-location, share link, download table, phone layout,
 //                         hotspot zones, Telugu/Hindi/English + listen, town search, tree-loss alert
 var SIZE_KM = 14;              // analysed area around the chosen place (km)
@@ -30,6 +30,8 @@ var YEARS_BACK = 5;            // tree-loss comparison period
 var MAX_ZONES = 5;             // hotspot zones shown (A–E)
 var MAX_ZONE_KM2 = 3;          // a zone bigger than this is split into neighbourhood-size pieces
 var KEY_SECONDS = 3;           // colour key hides itself after this many seconds (0 = stay until tapped again)
+var USABLE_OPEN = 0.3;          // share of open ground (not roofs, not roads) assumed plantable (much is private yards/paths)
+var STREET_TREE_PER_M2 = 1 / 160; // street trees: road area / 8 m width = length; 1 tree per 10 m on half of it
 var TREE_MIN_HEIGHT_M = 3;     // in the 1 m canopy map, anything 3 m or taller counts as a tree
 var FUTURE_YEAR = 2050;        // the future year shown in "Past, now and future"
 var PAST_START = 2014;         // first full year of Landsat 8 heat data
@@ -37,7 +39,7 @@ var CLIMATE_SINCE = 1990;      // ERA5 weather records: warming trend measured f
 // NASA NEX-GDDP-CMIP6 climate models used for the future (a mix of low, middle and high warming models)
 var CLIMATE_MODELS = ['ACCESS-CM2', 'GFDL-ESM4', 'MPI-ESM1-2-HR', 'MRI-ESM2-0', 'UKESM1-0-LL'];
 var text = require('users/gena/packages:text');   // draws letters on the map
-var APP_VERSION = 'v33';
+var APP_VERSION = 'v34';
 var GITHUB_URL = 'https://github.com/BangariPrajwal/tree-doctor';
 var LINKEDIN_URL = 'https://www.linkedin.com/in/prajwal-bangari-800434118';
 // One-tap examples: [name, latitude, longitude] of a dense, lived-in part of each city
@@ -69,6 +71,16 @@ var T = {
     story: function(hs, c, ts, n) { return 'This area is ' + hs + ' (roofs and roads reach ' + c + '°C on the hottest days) and has ' + ts +
       ', so it needs about ' + n + ' more trees.'; },
     storyOk: 'This area already has enough trees. Please protect them.',
+    needLine: function(n) { return 'Needed for 30% tree cover: about ' + n + ' trees'; },
+    roomLine: function(f) { return 'Room for about ' + f + ' trees (open ground + street edges)'; },
+    planPlant: '🌳 Plan: plant trees in open plots and along streets',
+    planMix: '🌳+⬜ Plan: plant what fits, and paint roofs white for the rest',
+    planRoofs: '⬜ Plan: cool white roofs first, plus terrace gardens, large planters and tree pits in roads',
+    coolLine: function(f, c) { return 'Planting these ' + f + ' trees → whole area about ' + c + '°C cooler; under their shade the ground is 10–20°C cooler'; },
+    storySpace: function(hs, c, ts, n, f) { return 'This area is ' + hs + ' (roofs and roads reach ' + c + '°C on the hottest days) and has ' + ts +
+      '. It would need about ' + n + ' more trees, but there is room for only about ' + f + ' – so cool roofs matter here too.'; },
+    fSpace: function(f, n) { return '• There is room for about ' + f + ' of the ' + n + ' trees these zones need. For the rest, cool white roofs, terrace gardens and planters are the fastest fix.'; },
+    spaceNote: 'Room for trees: 30% of open ground (not roofs or roads) at 50 m² per grown tree, plus one tree every 10 m along half of the road edges. Satellites cannot tell public from private land, so check each site.',
     timeTitle: 'Past, now and future',
     past: function(c) { return '📅 ' + PAST_START + '–' + (PAST_START + 2) + ': about ' + c + '°C'; },
     nowT: function(c) { return '📍 Now: about ' + c + '°C'; },
@@ -158,6 +170,16 @@ var T = {
     story: function(hs, c, ts, n) { return 'ఈ ప్రాంతం ' + hs + ' (అత్యంత వేడి రోజుల్లో పైకప్పులు, రోడ్లు ' + c + '°C వరకు వేడెక్కుతాయి), ఇక్కడ ' + ts +
       '. అందుకే సుమారు ' + n + ' చెట్లు ఇంకా నాటాలి.'; },
     storyOk: 'ఈ ప్రాంతంలో ఇప్పటికే తగినన్ని చెట్లు ఉన్నాయి. వాటిని కాపాడండి.',
+    needLine: function(n) { return 'చెట్ల కవరేజీ 30% కావాలంటే: సుమారు ' + n + ' చెట్లు అవసరం'; },
+    roomLine: function(f) { return 'సుమారు ' + f + ' చెట్లకు స్థలం ఉంది (ఖాళీ స్థలాలు + రోడ్ల అంచులు)'; },
+    planPlant: '🌳 ప్రణాళిక: ఖాళీ స్థలాల్లో, వీధుల వెంట చెట్లు నాటండి',
+    planMix: '🌳+⬜ ప్రణాళిక: స్థలం ఉన్నచోట చెట్లు నాటండి, మిగతా చోట్ల పైకప్పులకు తెల్ల రంగు వేయండి',
+    planRoofs: '⬜ ప్రణాళిక: ముందుగా పైకప్పులకు తెల్ల రంగు, మేడపై తోటలు, పెద్ద కుండీలు, రోడ్ల అంచుల్లో చెట్ల గుంతలు',
+    coolLine: function(f, c) { return 'ఈ ' + f + ' చెట్లు నాటితే → ప్రాంతం మొత్తం సుమారు ' + c + '°C చల్లబడుతుంది; చెట్ల నీడలో నేల 10–20°C చల్లగా ఉంటుంది'; },
+    storySpace: function(hs, c, ts, n, f) { return 'ఈ ప్రాంతం ' + hs + ' (అత్యంత వేడి రోజుల్లో పైకప్పులు, రోడ్లు ' + c + '°C వరకు వేడెక్కుతాయి), ఇక్కడ ' + ts +
+      '. సుమారు ' + n + ' చెట్లు అవసరం, కానీ సుమారు ' + f + ' చెట్లకే స్థలం ఉంది – అందుకే ఇక్కడ తెల్ల పైకప్పులు కూడా ముఖ్యం.'; },
+    fSpace: function(f, n) { return '• ఈ జోన్లకు అవసరమైన ' + n + ' చెట్లలో సుమారు ' + f + ' చెట్లకే స్థలం ఉంది. మిగతా వాటికి బదులుగా తెల్ల పైకప్పులు, మేడపై తోటలు, కుండీలు త్వరగా ఫలితం ఇస్తాయి.'; },
+    spaceNote: 'చెట్లకు స్థలం: ఖాళీ నేలలో (పైకప్పులు, రోడ్లు కాకుండా) 30%, ఒక్కో చెట్టుకు 50 చ.మీ., అలాగే సగం రోడ్ల అంచుల వెంట ప్రతి 10 మీ.కు ఒక చెట్టు. ఉపగ్రహాలు ప్రభుత్వ, ప్రైవేట్ భూమిని గుర్తించలేవు, కాబట్టి ప్రతి స్థలాన్ని పరిశీలించండి.',
     timeTitle: 'గతం, ఇప్పుడు, భవిష్యత్తు',
     past: function(c) { return '📅 ' + PAST_START + '–' + (PAST_START + 2) + ': సుమారు ' + c + '°C'; },
     nowT: function(c) { return '📍 ఇప్పుడు: సుమారు ' + c + '°C'; },
@@ -243,6 +265,16 @@ var T = {
     story: function(hs, c, ts, n) { return 'यह इलाका ' + hs + ' (सबसे गर्म दिनों में छतें और सड़कें ' + c + '°C तक गर्म होती हैं) और यहाँ ' + ts +
       '। इसलिए लगभग ' + n + ' और पेड़ लगाने चाहिए।'; },
     storyOk: 'इस इलाके में पहले से काफ़ी पेड़ हैं। उन्हें बचाइए।',
+    needLine: function(n) { return '30% पेड़ों के लिए ज़रूरत: लगभग ' + n + ' पेड़'; },
+    roomLine: function(f) { return 'लगभग ' + f + ' पेड़ों के लिए जगह है (खाली ज़मीन + सड़कों के किनारे)'; },
+    planPlant: '🌳 योजना: खाली ज़मीन पर और सड़कों के किनारे पेड़ लगाएँ',
+    planMix: '🌳+⬜ योजना: जहाँ जगह है वहाँ पेड़ लगाएँ, बाकी जगह छतों को सफ़ेद रंगें',
+    planRoofs: '⬜ योजना: पहले छतों को सफ़ेद रंगें, साथ में छत पर बगीचे, बड़े गमले और सड़कों के किनारे पेड़ों के गड्ढे',
+    coolLine: function(f, c) { return 'ये ' + f + ' पेड़ लगाने से → पूरा इलाका लगभग ' + c + '°C ठंडा; पेड़ों की छाया में ज़मीन 10–20°C ठंडी'; },
+    storySpace: function(hs, c, ts, n, f) { return 'यह इलाका ' + hs + ' (सबसे गर्म दिनों में छतें और सड़कें ' + c + '°C तक गर्म होती हैं) और यहाँ ' + ts +
+      '। लगभग ' + n + ' पेड़ चाहिए, पर जगह सिर्फ़ लगभग ' + f + ' पेड़ों की है – इसलिए यहाँ सफ़ेद छतें भी ज़रूरी हैं।'; },
+    fSpace: function(f, n) { return '• इन क्षेत्रों को चाहिए ' + n + ' पेड़ों में से लगभग ' + f + ' के लिए ही जगह है। बाकी के लिए सफ़ेद छतें, छत पर बगीचे और गमले सबसे जल्दी असर करते हैं।'; },
+    spaceNote: 'पेड़ों के लिए जगह: खाली ज़मीन (छत और सड़क नहीं) का 30%, हर पेड़ के लिए 50 वर्ग मी., साथ में आधी सड़कों के किनारे हर 10 मी. पर एक पेड़। उपग्रह सरकारी और निजी ज़मीन में फ़र्क़ नहीं कर सकते, इसलिए हर जगह की जाँच करें।',
     timeTitle: 'पहले, अब और आगे',
     past: function(c) { return '📅 ' + PAST_START + '–' + (PAST_START + 2) + ': लगभग ' + c + '°C'; },
     nowT: function(c) { return '📍 अब: लगभग ' + c + '°C'; },
@@ -461,7 +493,7 @@ function refreshText() {
   coordBox.setPlaceholder(t('coordPh'));
   coordBtn.setLabel(t('coordBtn'));
   coordHelpL.setValue(t('coordHelp'));
-  aboutL.setValue(t('about'));
+  aboutL.setValue(t('about') + ' ' + t('spaceNote'));
   buildLegend();
   if (lastResult) { showResults(lastResult); }
 }
@@ -673,6 +705,11 @@ function analyse(lon, lat, placeName) {
     reducer: ee.Reducer.mean().setOutputs(['open_space']), scale: 10, tileScale: 4});
   cells = pop.reduceRegions({collection: cells,
     reducer: ee.Reducer.sum().setOutputs(['pop']), scale: 100, tileScale: 4});
+  // Plantable space: open ground (not roofs, not roads) and road area, in m², where people live
+  var spaceImg = ee.Image.cat([
+    openSpace.multiply(ee.Image.pixelArea()).rename('open_m2'),
+    roads.updateMask(livedIn).multiply(ee.Image.pixelArea()).rename('road_m2')]);
+  cells = spaceImg.reduceRegions({collection: cells, reducer: ee.Reducer.sum(), scale: 10, tileScale: 4});
 
   var homes = cells
     .filter(ee.Filter.notNull(['heat', 'open_space', 'res', 'nonres', 'bdens', 'cut']))
@@ -704,6 +741,12 @@ function analyse(lon, lat, placeName) {
       heat: h, trees: tr, cutHa: ee.Number(f.get('cut')).multiply(CELL_M * CELL_M / 10000), people: f.get('pop'),
       packed: ee.Number(f.get('open_space')).lte(packed),
       need: gap.multiply(CELL_M * CELL_M).divide(CANOPY_M2),
+      // trees that physically fit: part of the open ground + street edges, never more than needed
+      fit: ee.Number(ee.Algorithms.If(ee.Algorithms.IsEqual(f.get('open_m2'), null), 0, f.get('open_m2')))
+          .multiply(USABLE_OPEN).divide(CANOPY_M2)
+        .add(ee.Number(ee.Algorithms.If(ee.Algorithms.IsEqual(f.get('road_m2'), null), 0, f.get('road_m2')))
+          .multiply(STREET_TREE_PER_M2))
+        .min(gap.multiply(CELL_M * CELL_M).divide(CANOPY_M2)),
       lon: c.get(0), lat: c.get(1)
     });
   });
@@ -711,7 +754,7 @@ function analyse(lon, lat, placeName) {
   homes = homes.map(function(f) {
     return f.set('priority', ee.Number(f.get('score')).divide(maxScore).multiply(100));
   });
-  var props = ['priority', 'score', 'heat', 'trees', 'cutHa', 'people', 'packed', 'need', 'lat', 'lon'];
+  var props = ['priority', 'score', 'heat', 'trees', 'cutHa', 'people', 'packed', 'need', 'fit', 'lat', 'lon'];
   var summary = ee.Dictionary({
     n: n,
     avgHeat: avgHeat,
@@ -854,7 +897,11 @@ function makeZones(all) {
       people: people, heat: wavg(function(d) { return d.heat; }),
       trees: treesNow, cutHa: sum(function(d) { return d.cutHa; }),
       need: sum(function(d) { return d.need; }),
-      cooling: Math.max(0, TARGET - treesNow) * 10 * COOLING_PER_10PCT,
+      fit: sum(function(d) { return d.fit || 0; }),
+      // cooling only from the trees that really fit (their canopy share of the zone)
+      cooling: Math.min(Math.max(0, TARGET - treesNow),
+                        sum(function(d) { return d.fit || 0; }) * CANOPY_M2 / (cs.length * CELL_M * CELL_M))
+               * 10 * COOLING_PER_10PCT,
       packed: sum(function(d) { return d.packed ? 1 : 0; }) * 2 >= cs.length,
       km2: cs.length * CELL_M * CELL_M / 1e6
     };
@@ -920,13 +967,20 @@ function plus(x) { return (x >= 0 ? '+' : '') + x.toFixed(1); }
 function roundTo(x, k) { return Math.round(x / k) * k; }
 function nice(x) { return Number(x).toLocaleString(); }
 
+function planOf(z) {
+  if (z.need < 50) { return 'ok'; }
+  var ratio = z.fit / z.need;
+  return ratio >= 0.7 ? 'plant' : ratio >= 0.2 ? 'mix' : 'roofs';
+}
 function showResults(r) {
   results.clear();
   var zoneNeed = r.zones.reduce(function(s, z) { return s + z.need; }, 0);
   var zonePeople = r.zones.reduce(function(s, z) { return s + z.people; }, 0);
+  var zoneFit = r.zones.reduce(function(s, z) { return s + z.fit; }, 0);
   var findings = t('fHeat')(Math.round(r.avgHeat)) + '\n' + t('fTrees')(Math.round(100 * r.under5 / r.n)) +
     (r.cutHa >= 0.5 ? '\n' + t('fLoss')(r.cutHa.toFixed(1)) : '') +
     (zoneNeed > 0 ? '\n' + t('fPlan')(nice(roundTo(zoneNeed, 100)), nice(roundTo(zonePeople, 100))) : '') +
+    (zoneNeed > 0 && zoneFit < zoneNeed * 0.7 ? '\n' + t('fSpace')(nice(roundTo(zoneFit, 100)), nice(roundTo(zoneNeed, 100))) : '') +
     (r.rate ? '\n' + t('fRate')(r.rate.toFixed(2), r.rateCity) : '');
   var tl = r.timeline;
   if (!tl) {
@@ -953,14 +1007,22 @@ function showResults(r) {
       t('size')(z.km2.toFixed(z.km2 < 1 ? 2 : 1))
     ];
     if (z.cutHa >= 0.5) { lines.push(t('lost')(z.cutHa.toFixed(1))); }
-    lines.push(z.packed ? t('doPacked') : t('doOpen'));
-    lines.push(t('needed')(nice(roundTo(z.need, 50)), z.cooling.toFixed(1)));
+    var plan = planOf(z);
+    var fitRounded = roundTo(z.fit, 50);
+    if (plan !== 'ok') {
+      lines.push(t('needLine')(nice(roundTo(z.need, 50))));
+      lines.push(t('roomLine')(nice(fitRounded)));
+      lines.push(plan === 'plant' ? t('planPlant') : plan === 'mix' ? t('planMix') : t('planRoofs'));
+      if (fitRounded >= 50) { lines.push(t('coolLine')(nice(fitRounded), z.cooling.toFixed(1))); }
+    }
     var title = (['🥇', '🥈', '🥉'][i] || '📍') + ' ' + t('zone')(LETTERS[i], i);
 
     var needRounded = roundTo(z.need, 50);
-    var story = needRounded >= 50
-      ? t('story')(t('heatS')[heatIdx(z.heat)], Math.round(z.heat), t('treeS')[treeIdx(treePct)], nice(needRounded))
-      : t('storyOk');
+    var story = needRounded < 50 ? t('storyOk')
+      : plan === 'plant'
+        ? t('story')(t('heatS')[heatIdx(z.heat)], Math.round(z.heat), t('treeS')[treeIdx(treePct)], nice(needRounded))
+        : t('storySpace')(t('heatS')[heatIdx(z.heat)], Math.round(z.heat), t('treeS')[treeIdx(treePct)],
+            nice(needRounded), nice(fitRounded));
     var card = ui.Panel({style: {border: '1px solid #ccc', padding: '8px', margin: '6px 0',
       backgroundColor: i === 0 ? '#fff4f4' : 'white'}});
     card.add(ui.Label(title, {fontSize: '16px', fontWeight: 'bold', margin: '0 0 4px 0', backgroundColor: CLEAR}));
@@ -1011,7 +1073,9 @@ function downloadLink(r) {
       tree_cover_pct: Math.round(d.trees * 1000) / 10,
       people: Math.round(d.people),
       trees_needed_for_30pct: roundTo(d.need, 10),
-      treatment: d.packed ? 'street trees + cool roofs' : 'plant trees in open plots and streets',
+      trees_room_for: roundTo(d.fit || 0, 10),
+      plan: (function() { var p = planOf(d); return p === 'plant' ? 'plant trees' : p === 'mix' ? 'plant what fits + cool roofs'
+        : p === 'roofs' ? 'cool roofs, planters, terrace gardens' : 'protect existing trees'; })(),
       lat: Math.round(d.lat * 1e5) / 1e5,
       lon: Math.round(d.lon * 1e5) / 1e5,
       google_maps: 'https://www.google.com/maps/search/?api=1&query=' + d.lat.toFixed(5) + ',' + d.lon.toFixed(5)
@@ -1020,7 +1084,7 @@ function downloadLink(r) {
     return ee.Feature(null, row);
   });
   var cols = ['rank', 'zone', 'priority_0_100', 'ground_temp_C', 'tree_cover_pct', 'people',
-              'trees_needed_for_30pct', 'treatment', 'trees_cut_since_' + THEN_YEAR + '_ha', 'lat', 'lon', 'google_maps'];
+              'trees_needed_for_30pct', 'trees_room_for', 'plan', 'trees_cut_since_' + THEN_YEAR + '_ha', 'lat', 'lon', 'google_maps'];
   ee.FeatureCollection(rows).getDownloadURL('CSV', cols, 'tree_doctor_results', function(url, err) {
     if (err || !url) { return; }
     r.csvUrl = url;
